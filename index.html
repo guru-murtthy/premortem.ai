@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PremortemAI — Predictive Health Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════ */
+:root {
+  --bg:        #05080f;
+  --surface:   #0b1220;
+  --surface2:  #0f1a2e;
+  --surface3:  #131f35;
+  --border:    #182640;
+  --border2:   #1e2f4a;
+  --accent:    #00e5ff;
+  --accent-dim:#00b8cc;
+  --purple:    #7c3aed;
+  --danger:    #f43f5e;
+  --warn:      #f59e0b;
+  --success:   #10b981;
+  --text:      #dde9f8;
+  --text2:     #8fa8c8;
+  --text3:     #4a6280;
+  --glow-c:    rgba(0,229,255,0.12);
+  --glow-w:    rgba(245,158,11,0.12);
+  --glow-d:    rgba(244,63,94,0.12);
+  --card-bg:   #091626;
+  --font-mono: 'Space Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+  --font-head: 'Syne', sans-serif;
+  --r:         12px;
+  --r-sm:      8px;
+}
+
+/* ═══════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════ */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  height: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* scanline texture */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ambient glows */
+#glow-tl, #glow-br {
+  position: fixed; border-radius: 50%;
+  pointer-events: none; z-index: 0;
+}
+#glow-tl {
+  width: 700px; height: 700px;
+  top: -200px; left: -200px;
+  background: radial-gradient(circle, rgba(0,229,255,0.04) 0%, transparent 65%);
+}
+#glow-br {
+  width: 600px; height: 600px;
+  bottom: -200px; right: -150px;
+  background: radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 65%);
+}
+
+/* ═══════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ═══════════════════════════════════
+   LAYOUT
+═══════════════════════════════════ */
+#app { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════
+   TOPBAR
+═══════════════════════════════════ */
+#topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  height: 52px; flex-shrink: 0;
+  background: rgba(5,8,15,0.9);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  position: relative; z-index: 50;
+}
+.logo {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font-head); font-size: 1.15rem; font-weight: 800;
+  letter-spacing: -0.3px; user-select: none;
+}
+.logo-bolt { color: var(--accent); font-size: 1.1rem; }
+.logo em { color: var(--accent); font-style: normal; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.live-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.2);
+  border-radius: 20px; padding: 3px 10px;
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.2;} }
+.topbar-chip {
+  font-size: 0.72rem; color: var(--text2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 3px 10px;
+}
+#topClock { font-family: var(--font-mono); }
+.risk-topbar {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.72rem;
+}
+.risk-num-top {
+  font-weight: 700; color: var(--warn);
+  background: var(--glow-w); border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--r-sm); padding: 2px 8px;
+}
+
+/* ═══════════════════════════════════
+   BODY LAYOUT (sidebar + main)
+═══════════════════════════════════ */
+#body { display: flex; flex: 1; overflow: hidden; }
+
+/* ═══════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════ */
+#sidebar {
+  width: 58px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: 14px 0; gap: 4px;
+}
+.nav-btn {
+  width: 42px; height: 42px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border-radius: 10px; cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s; position: relative;
+  user-select: none;
+}
+.nav-btn:hover { background: var(--surface2); border-color: var(--border); }
+.nav-btn.active {
+  background: rgba(0,229,255,0.08);
+  border-color: rgba(0,229,255,0.25);
+  box-shadow: 0 0 12px rgba(0,229,255,0.06);
+}
+.nav-btn .ni { font-size: 1.15rem; line-height: 1; }
+.nav-btn .nl {
+  font-size: 0.42rem; font-weight: 600; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--text3);
+}
+.nav-btn.active .nl { color: var(--accent); }
+.nav-badge {
+  position: absolute; top: 5px; right: 5px;
+  background: var(--danger); color: #fff;
+  font-size: 0.48rem; font-weight: 700;
+  min-width: 13px; height: 13px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+}
+
+/* ═══════════════════════════════════
+   MAIN
+═══════════════════════════════════ */
+#main {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 20px 22px;
+}
+
+/* ═══════════════════════════════════
+   TAB PANELS
+═══════════════════════════════════ */
+.panel { display: none; }
+.panel.active { display: block; animation: panelIn 0.25s ease; }
+@keyframes panelIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+
+/* ═══════════════════════════════════
+   CARDS
+═══════════════════════════════════ */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 20%; right: 20%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,229,255,0.15), transparent);
+}
+.card-title {
+  font-family: var(--font-head); font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.2px; color: var(--text3);
+  display: flex; align-items: center; gap: 7px; margin-bottom: 14px;
+}
+.ct-badge {
+  font-size: 0.55rem; padding: 2px 6px; border-radius: 4px;
+  background: rgba(0,229,255,0.08); color: var(--accent);
+  border: 1px solid rgba(0,229,255,0.18); letter-spacing: .5px;
+}
+
+/* ═══════════════════════════════════
+   GRID HELPERS
+═══════════════════════════════════ */
+.g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 14px; }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.g2-1 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+.mb { margin-bottom: 14px; }
+.sec-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.sec-hd-left h1 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 800; }
+.sec-hd-left p { font-size: 0.7rem; color: var(--text3); margin-top: 2px; }
+
+/* ═══════════════════════════════════
+   BUTTONS
+═══════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 15px; border-radius: var(--r-sm); border: none;
+  font-family: var(--font-body); font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; transition: all 0.18s; white-space: nowrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg,var(--accent),var(--accent-dim));
+  color: #000;
+}
+.btn-primary:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.btn-sm { padding: 5px 10px; font-size: 0.7rem; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger-ghost {
+  background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25);
+  color: var(--danger);
+}
+
+/* ═══════════════════════════════════
+   RISK RING (dashboard)
+═══════════════════════════════════ */
+.risk-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.risk-ring-wrap { position: relative; width: 130px; height: 130px; margin: 4px 0; }
+.risk-ring-wrap svg { transform: rotate(-90deg); }
+.ring-bg  { fill:none; stroke:var(--border2); stroke-width:9; }
+.ring-fg  {
+  fill:none; stroke:var(--warn); stroke-width:9; stroke-linecap:round;
+  stroke-dasharray:340; stroke-dashoffset:112;
+  transition: stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1), stroke .4s;
+}
+.ring-center {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.ring-val {
+  font-family:var(--font-head); font-size:2.4rem; font-weight:800;
+  line-height:1; color:var(--warn); transition:color .4s;
+}
+.ring-label { font-size:0.6rem; color:var(--text3); letter-spacing:.5px; text-transform:uppercase; }
+.risk-badge {
+  font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px;
+  padding: 3px 10px; border-radius:20px;
+  background:var(--glow-w); border:1px solid rgba(245,158,11,.3);
+  color:var(--warn);
+}
+.pred-box {
+  background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.22);
+  border-radius:var(--r-sm); padding:9px 11px;
+  font-size:0.7rem; color:var(--warn); line-height:1.55; width:100%;
+  margin-top:4px;
+}
+
+/* ═══════════════════════════════════
+   SIGNAL CARDS
+═══════════════════════════════════ */
+.sig-val {
+  font-family:var(--font-head); font-size:1.85rem; font-weight:800; line-height:1;
+  margin: 6px 0 2px;
+}
+.sig-unit { font-size:0.7rem; color:var(--text3); }
+.sig-delta { font-size:0.68rem; font-weight:600; margin-top:3px; }
+.delta-bad  { color:var(--danger); }
+.delta-warn { color:var(--warn); }
+.delta-ok   { color:var(--success); }
+.sig-bar { height:3px; background:var(--border); border-radius:2px; margin-top:8px; overflow:hidden; }
+.sig-bar-fill { height:100%; border-radius:2px; transition:width 1.2s ease; }
+
+/* ═══════════════════════════════════
+   CHARTS
+═══════════════════════════════════ */
+.ch { position:relative; }
+.ch-180 { height:180px; }
+.ch-200 { height:200px; }
+.ch-160 { height:160px; }
+
+/* ═══════════════════════════════════
+   VOICE TAB
+═══════════════════════════════════ */
+.mic-outer {
+  width:90px; height:90px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--surface2); border:2px solid var(--border2);
+  font-size:2.2rem; cursor:pointer; transition:all .3s;
+  position:relative;
+}
+.mic-outer:hover { border-color:var(--accent); box-shadow:0 0 24px rgba(0,229,255,.15); }
+.mic-outer.rec {
+  border-color:var(--danger);
+  animation:sonar 1.6s infinite;
+}
+@keyframes sonar {
+  0%   { box-shadow:0 0 0 0 rgba(244,63,94,.35); }
+  70%  { box-shadow:0 0 0 22px rgba(244,63,94,0); }
+  100% { box-shadow:0 0 0 0 rgba(244,63,94,0); }
+}
+.bio-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+.bio-item {
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:var(--r-sm); padding:12px;
+}
+.bio-lbl { font-size:0.65rem; color:var(--text3); margin-bottom:3px; }
+.bio-val { font-family:var(--font-mono); font-size:1.2rem; font-weight:700; color:var(--accent); }
+.bio-sub { font-size:0.58rem; color:var(--text3); margin-top:2px; }
+.stress-track {
+  height:8px; border-radius:4px;
+  background:linear-gradient(90deg,var(--success),var(--warn),var(--danger));
+  position:relative; margin:8px 0;
+}
+.stress-needle {
+  position:absolute; top:-5px;
+  width:4px; height:18px;
+  background:#fff; border-radius:2px;
+  transform:translateX(-50%);
+  box-shadow:0 0 8px rgba(255,255,255,.5);
+  transition:left 1s ease;
+}
+.stress-labels { display:flex; justify-content:space-between; font-size:0.58rem; color:var(--text3); }
+.marker-item {
+  border-radius:var(--r-sm); padding:10px 12px; font-size:0.72rem;
+}
+.marker-warn { background:rgba(245,158,11,.07); border:1px solid rgba(245,158,11,.22); color:var(--warn); }
+.marker-info { background:rgba(0,229,255,.05); border:1px solid rgba(0,229,255,.18); color:var(--accent); }
+/* ===== GOOGLE ASSISTANT STYLE WAVES ===== */
+
+.mic-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wave {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+}
+
+.wave.active {
+  animation: waveAnim 1.5s infinite;
+}
+
+.wave:nth-child(1) { animation-delay: 0s; }
+.wave:nth-child(2) { animation-delay: 0.4s; }
+.wave:nth-child(3) { animation-delay: 0.8s; }
+
+@keyframes waveAnim {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+/* ═══════════════════════════════════
+   LAB TAB
+═══════════════════════════════════ */
+.upload-zone {
+  border:2px dashed var(--border2); border-radius:var(--r);
+  padding:32px 20px; text-align:center; cursor:pointer; transition:all .25s;
+}
+.upload-zone:hover { border-color:var(--accent); background:rgba(0,229,255,.02); }
+.upload-zone.dragover { border-color:var(--accent); background:rgba(0,229,255,.05); }
+.upload-ico { font-size:2.4rem; margin-bottom:10px; }
+.upload-title { font-size:0.9rem; font-weight:600; margin-bottom:4px; }
+.upload-sub { font-size:0.7rem; color:var(--text3); }
+.lab-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
+.fi label { display:block; font-size:0.65rem; color:var(--text3); font-weight:500; margin-bottom:4px; }
+.fi input {
+  width:100%; background:var(--surface2); border:1px solid var(--border2);
+  border-radius:var(--r-sm); padding:7px 10px;
+  color:var(--text); font-family:var(--font-mono); font-size:0.78rem;
+  outline:none; transition:border-color .18s;
+}
+.fi input:focus { border-color:var(--accent); }
+.lab-result-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:9px 0; border-bottom:1px solid var(--border);
+  font-size:0.8rem;
+}
+.lab-result-row:last-child { border-bottom:none; }
+.lrr-right { text-align:right; }
+.lrr-val { font-family:var(--font-mono); font-size:0.82rem; }
+.s-normal  { color:var(--success); font-size:0.65rem; font-weight:700; text-transform:uppercase; }
+.s-high    { color:var(--danger);  font-size:0.65rem; font-weight:700; text-transform:uppercase; }
+.s-borderline { color:var(--warn); font-size:0.65rem; font-weight:700; text-transform:uppercase; }
+.s-low     { color:var(--accent);  font-size:0.65rem; font-weight:700; text-transform:uppercase; }
+
+/* ═══════════════════════════════════
+   AI CHAT
+═══════════════════════════════════ */
+.chat-wrap {
+  display:flex; flex-direction:column;
+  height:calc(100vh - 130px); min-height:480px;
+}
+.chat-hd {
+  display:flex; align-items:center; gap:12px;
+  padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:12px;
+}
+.chat-avatar {
+  width:36px; height:36px; border-radius:9px;
+  background:linear-gradient(135deg,var(--purple),var(--accent));
+  display:flex; align-items:center; justify-content:center; font-size:1rem;
+  flex-shrink:0;
+}
+.chat-title { font-weight:600; font-size:0.88rem; }
+.chat-online {
+  font-size:0.65rem; color:var(--success);
+  display:flex; align-items:center; gap:4px; margin-top:2px;
+}
+.online-dot { width:5px; height:5px; border-radius:50%; background:var(--success); animation:blink 2s infinite; }
+.quick-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.q-btn {
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:20px; padding:4px 11px;
+  font-size:0.7rem; color:var(--text3); cursor:pointer; transition:all .18s;
+  font-family:var(--font-body);
+}
+.q-btn:hover { border-color:var(--accent); color:var(--accent); }
+.msgs {
+  flex:1; overflow-y:auto; display:flex; flex-direction:column;
+  gap:13px; padding-right:4px;
+}
+.msg { display:flex; gap:9px; max-width:88%; }
+.msg.ai  { align-self:flex-start; }
+.msg.usr { align-self:flex-end; flex-direction:row-reverse; }
+.msg-av {
+  width:26px; height:26px; border-radius:7px; font-size:0.8rem; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; margin-top:2px;
+}
+.msg.ai  .msg-av { background:linear-gradient(135deg,var(--purple),var(--accent)); }
+.msg.usr .msg-av { background:var(--surface2); border:1px solid var(--border2); }
+.bubble {
+  padding:9px 13px; border-radius:10px; font-size:0.8rem; line-height:1.6;
+}
+.msg.ai  .bubble { background:var(--surface2); border:1px solid var(--border2); border-top-left-radius:3px; }
+.msg.usr .bubble { background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.2); border-top-right-radius:3px; }
+.chat-input-row {
+  display:flex; gap:8px; margin-top:12px;
+  padding-top:12px; border-top:1px solid var(--border);
+}
+.ci {
+  flex:1; background:var(--surface2); border:1px solid var(--border2);
+  border-radius:var(--r-sm); padding:9px 13px; color:var(--text);
+  font-family:var(--font-body); font-size:0.82rem; outline:none; resize:none;
+  transition:border-color .18s;
+}
+.ci:focus { border-color:var(--accent); }
+.conf-row { display:flex; gap:0; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+.conf-item {
+  flex:1; text-align:center;
+  border-right:1px solid var(--border);
+}
+.conf-item:last-child { border-right:none; }
+.conf-l { font-size:0.58rem; color:var(--text3); margin-bottom:3px; }
+.conf-v { font-family:var(--font-mono); font-size:0.82rem; font-weight:700; color:var(--accent); }
+.typing-dots { display:flex; gap:4px; padding:6px 13px; }
+.td {
+  width:5px; height:5px; border-radius:50%; background:var(--text3);
+  animation:tdot 1.2s infinite;
+}
+.td:nth-child(2){animation-delay:.2s;} .td:nth-child(3){animation-delay:.4s;}
+@keyframes tdot { 0%,60%,100%{transform:translateY(0);opacity:.4;} 30%{transform:translateY(-6px);opacity:1;} }
+
+/* ═══════════════════════════════════
+   ALERTS
+═══════════════════════════════════ */
+.flt-row { display:flex; gap:7px; margin-bottom:14px; }
+.flt-btn {
+  padding:4px 12px; border-radius:20px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--text3); font-size:0.72rem; cursor:pointer; transition:all .18s;
+  font-family:var(--font-body);
+}
+.flt-btn.active { background:rgba(0,229,255,.08); border-color:rgba(0,229,255,.3); color:var(--accent); }
+.alert-card {
+  background:var(--surface2); border:1px solid var(--border2);
+  border-radius:var(--r); padding:14px; margin-bottom:10px;
+  border-left:3px solid var(--border);
+  transition:all .2s;
+}
+.alert-card:hover { border-color:rgba(0,229,255,.2); }
+.alert-card.critical { border-left-color:var(--danger); }
+.alert-card.warning  { border-left-color:var(--warn); }
+.alert-card.info     { border-left-color:var(--accent); }
+.alert-card.ok       { border-left-color:var(--success); }
+.alert-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.alert-title { font-weight:600; font-size:0.83rem; margin-bottom:3px; }
+.alert-body { font-size:0.74rem; color:var(--text2); line-height:1.5; }
+.alert-meta { font-size:0.62rem; color:var(--text3); margin-top:7px; }
+.alert-btns { display:flex; gap:5px; flex-shrink:0; }
+.dismiss-btn {
+  background:transparent; border:1px solid var(--border);
+  border-radius:5px; padding:3px 7px; font-size:0.62rem;
+  color:var(--text3); cursor:pointer; transition:all .18s;
+  font-family:var(--font-body);
+}
+.dismiss-btn:hover { border-color:var(--danger); color:var(--danger); }
+.tl { margin-top:16px; }
+.tl-item {
+  display:flex; gap:12px;
+  border-left:2px solid var(--border); padding:8px 0 8px 15px;
+  margin-left:5px; position:relative; font-size:0.77rem; color:var(--text3);
+}
+.tl-item::before {
+  content:''; position:absolute; left:-5px; top:12px;
+  width:8px; height:8px; border-radius:50%; background:var(--border2);
+}
+.tl-item:first-child::before { background:var(--accent); }
+.tl-time { font-family:var(--font-mono); font-size:0.62rem; color:var(--accent); flex-shrink:0; width:55px; }
+
+/* ═══════════════════════════════════
+   SPINNER / LOADERS
+═══════════════════════════════════ */
+.spinner {
+  width:18px; height:18px;
+  border:2px solid var(--border2); border-top-color:var(--accent);
+  border-radius:50%; animation:spin .7s linear infinite;
+  display:inline-block;
+}
+@keyframes spin { to{transform:rotate(360deg);} }
+.loading-center {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; min-height:160px; color:var(--text3); font-size:0.78rem;
+}
+/* ===== NEW UI UPGRADE ===== */
+
+#landing {
+  position: fixed;
+  inset: 0;
+  background: #05080f;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  text-align: center;
+}
+
+#landing button {
+  margin-top: 20px;
+  padding: 12px 25px;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#loadingOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99998;
+}
+
+* {
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+}
+
+@media (max-width: 768px) {
+  #sidebar {
+    width: 100%;
+    flex-direction: row;
+  }
+
+  .g3, .g2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+/* ===== HELP MODAL ===== */
+
+.help-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+}
+
+.help-box {
+  background: var(--surface2);
+  padding: 25px;
+  border-radius: 12px;
+  max-width: 500px;
+  color: white;
+}
+
+.help-box h2 {
+  margin-bottom: 10px;
+}
+
+.help-box h3 {
+  margin-top: 10px;
+  color: var(--accent);
+}
+
+.help-box button {
+  margin-top: 15px;
+  padding: 10px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+<!-- LANDING PAGE -->
+<div id="landing">
+  <h1>⚡ Premortem AI</h1>
+  <p>Predict health risks before they happen</p>
+  <button onclick="startApp()">Enter Dashboard</button>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay">
+  <div style="color:white;text-align:center;">
+    <div class="spinner"></div>
+    <p>Running AI Analysis...</p>
+  </div>
+</div>
+
+<!-- ambient glows -->
+<div id="glow-tl"></div>
+<div id="glow-br"></div>
+
+<div id="app">
+
+  <!-- ══ TOPBAR ══ -->
+  <div id="topbar">
+    <div class="logo">
+      <span class="logo-bolt">⚡</span>
+      Premortem<em>AI</em>
+    </div>
+    <div class="topbar-right">
+     <button class="btn btn-ghost btn-sm" onclick="openHelp()">❓ Help</button>
+      <div class="live-pill"><div class="live-dot"></div>Live Monitoring</div>
+      <div class="topbar-chip" id="topClock">--:--:--</div>
+      <div class="topbar-chip">👤 Demo User</div>
+      <div class="risk-topbar">
+        <span style="font-size:.65rem;color:var(--text3);">RISK</span>
+        <span class="risk-num-top" id="topRisk">67</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BODY ══ -->
+  <div id="body">
+
+    <!-- ── SIDEBAR ── -->
+    <nav id="sidebar">
+      <div class="nav-btn active" data-tab="dashboard" onclick="nav(this)">
+        <span class="ni">📊</span><span class="nl">Dash</span>
+      </div>
+      <div class="nav-btn" data-tab="voice" onclick="nav(this)">
+        <span class="ni">🎙</span><span class="nl">Voice</span>
+      </div>
+      <div class="nav-btn" data-tab="lab" onclick="nav(this)">
+        <span class="ni">🧬</span><span class="nl">Labs</span>
+      </div>
+      <div class="nav-btn" data-tab="ai" onclick="nav(this)">
+        <span class="ni">🤖</span><span class="nl">AI</span>
+      </div>
+      <div class="nav-btn" data-tab="alerts" onclick="nav(this)">
+        <span class="ni">🚨</span><span class="nl">Alerts</span>
+        <span class="nav-badge" id="alertBadge">3</span>
+      </div>
+    </nav>
+<!-- HELP MODAL -->
+<div id="helpModal" class="help-modal">
+  <div class="help-box">
+    <h2>🚀 How to Use Premortem AI</h2>
+
+    <h3>📊 Dashboard</h3>
+    <p>View your real-time health risk and signals.</p>
+
+    <h3>🎙 Voice Analysis</h3>
+    <p>Click the mic, speak for 5 seconds, and AI analyzes stress.</p>
+
+    <h3>🧬 Lab Analyzer</h3>
+    <p>Upload lab report or enter values manually → click Analyze.</p>
+
+    <h3>🤖 AI Assistant</h3>
+    <p>Ask questions about your health and get insights.</p>
+
+    <h3>🚨 Alerts</h3>
+    <p>Check warnings and recommendations based on your data.</p>
+
+    <button onclick="closeHelp()">Close</button>
+  </div>
+</div>
+
+    <!-- ── MAIN ── -->
+    <div id="main">
+
+      <!-- ════ DASHBOARD ════ -->
+      <div class="panel active" id="p-dashboard">
+        <div class="sec-hd">
+          <div class="sec-hd-left">
+            <h1>Health Risk Overview</h1>
+            <p>5-signal fusion model · Updated every 3s</p>
+          </div>
+          <button class="btn btn-primary" onclick="runAI()">⚡ Run AI Analysis</button>
+        </div>
+
+        <!-- Row 1: Risk + 5 signals -->
+        <div class="g3" style="grid-template-columns:1fr 1fr 1fr;">
+          <!-- Risk ring -->
+          <div class="card risk-card">
+            <div class="card-title">Composite Risk Score <span class="ct-badge">REAL-TIME</span></div>
+            <div class="risk-ring-wrap">
+              <svg viewBox="0 0 130 130" width="130" height="130">
+                <circle class="ring-bg" cx="65" cy="65" r="54"/>
+                <circle class="ring-fg" id="riskArc" cx="65" cy="65" r="54"/>
+              </svg>
+              <div class="ring-center">
+                <div class="ring-val" id="riskVal">67</div>
+                <div class="ring-label">/ 100</div>
+              </div>
+            </div>
+            <div class="risk-badge" id="riskBadge">⚠ Elevated Risk</div>
+            <div class="pred-box">⚠ <strong>48-Hour Prediction Active</strong><br>Hypertensive event probability elevated. Monitor BP every 2 hours and reduce sodium.</div>
+          </div>
+
+          <!-- Signals: 5 cards in a 2-col sub-grid spanning 2 cols -->
+          <div style="grid-column:span 2; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr 1fr; gap:10px;">
+            <div class="card" style="padding:14px;">
+              <div class="card-title" style="margin-bottom:6px;">🎙 Voice Stress</div>
+              <div class="sig-val" id="sv-voice" style="color:var(--warn)">78</div>
+              <div class="sig-unit">/ 100</div>
+              <div class="sig-delta delta-warn">↑ +36 from last week</div>
+              <div class="sig-bar"><div class="sig-bar-fill" id="sb-voice" style="width:78%;background:var(--warn)"></div></div>
+            </div>
+            <div class="card" style="padding:14px;">
+              <div class="card-title" style="margin-bottom:6px;">👁 Facial rPPG</div>
+              <div class="sig-val" id="sv-hr" style="color:var(--accent)">72</div>
+              <div class="sig-unit">bpm · BP est: 128/82</div>
+              <div class="sig-delta delta-ok">↔ Stable</div>
+              <div class="sig-bar"><div class="sig-bar-fill" id="sb-hr" style="width:55%;background:var(--accent)"></div></div>
+            </div>
+            <div class="card" style="padding:14px;">
+              <div class="card-title" style="margin-bottom:6px;">😴 Sleep Quality</div>
+              <div class="sig-val" id="sv-sleep" style="color:var(--danger)">34</div>
+              <div class="sig-unit">% · REM deficit</div>
+              <div class="sig-delta delta-bad">↓ Poor — 3rd night</div>
+              <div class="sig-bar"><div class="sig-bar-fill" id="sb-sleep" style="width:34%;background:var(--danger)"></div></div>
+            </div>
+            <div class="card" style="padding:14px;">
+              <div class="card-title" style="margin-bottom:6px;">⌨ Typing Rhythm</div>
+              <div class="sig-val" id="sv-typing" style="color:var(--warn)">61</div>
+              <div class="sig-unit">/ 100</div>
+              <div class="sig-delta delta-warn">↑ Slight irregularity</div>
+              <div class="sig-bar"><div class="sig-bar-fill" id="sb-typing" style="width:61%;background:var(--warn)"></div></div>
+            </div>
+            <div class="card" style="padding:14px;grid-column:span 2;">
+              <div class="card-title" style="margin-bottom:6px;">📍 Mobility Score</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <div class="sig-val" id="sv-mob" style="color:var(--success)">84</div>
+                  <div class="sig-unit">/ 100 · Normal gait</div>
+                  <div class="sig-delta delta-ok">✓ Step regularity 94%</div>
+                </div>
+                <div style="font-size:2rem;opacity:.3;">🚶</div>
+              </div>
+              <div class="sig-bar" style="margin-top:8px;"><div class="sig-bar-fill" id="sb-mob" style="width:84%;background:var(--success)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Trend + Radar -->
+        <div class="g2">
+          <div class="card">
+            <div class="card-title">7-Day Risk Trend</div>
+            <div class="ch ch-180"><canvas id="trendChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Signal Radar</div>
+            <div class="ch ch-180"><canvas id="radarChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ VOICE ════ -->
+      <div class="panel" id="p-voice">
+        <div class="sec-hd">
+          <div class="sec-hd-left">
+            <h1>Voice Biomarker Analysis</h1>
+            <p>Speak 5 seconds · AI acoustic biomarker extraction</p>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="card">
+            <!-- Mic -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 0;">
+              <div class="mic-container">
+  <div class="wave"></div>
+  <div class="wave"></div>
+  <div class="wave"></div>
+
+  <div class="mic-outer" id="micBtn" onclick="toggleRec()">🎙</div>
+</div>
+              <div id="recStatus" style="font-size:0.78rem;color:var(--text3);">Tap to start recording</div>
+            </div>
+            <div class="bio-grid">
+              <div class="bio-item"><div class="bio-lbl">Pitch (Hz)</div><div class="bio-val" id="bPitch">--</div><div class="bio-sub">Fundamental freq</div></div>
+              <div class="bio-item"><div class="bio-lbl">Energy (dB)</div><div class="bio-val" id="bEnergy">--</div><div class="bio-sub">RMS amplitude</div></div>
+              <div class="bio-item"><div class="bio-lbl">Jitter (%)</div><div class="bio-val" id="bJitter">--</div><div class="bio-sub">Pitch irregularity</div></div>
+              <div class="bio-item"><div class="bio-lbl">Shimmer</div><div class="bio-val" id="bShimmer">--</div><div class="bio-sub">Amplitude variation</div></div>
+            </div>
+            <div style="margin-top:16px;">
+              <div style="display:flex;justify-content:space-between;font-size:0.74rem;margin-bottom:6px;">
+                <span>Composite Stress Index</span>
+                <span style="color:var(--warn);font-weight:700;">78 / 100</span>
+              </div>
+              <div class="stress-track"><div class="stress-needle" id="stressNeedle" style="left:78%;"></div></div>
+              <div class="stress-labels"><span>Low</span><span>Medium</span><span>High</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Voice Trend (14 days)</div>
+            <div class="ch ch-160"><canvas id="voiceTrend"></canvas></div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+              <div class="marker-item marker-warn">
+                📈 <strong>Elevated vocal stress detected</strong><br>
+                <span style="font-size:.68rem;">Pitch variance 2.3σ above baseline. Possible sympathetic activation or fatigue.</span>
+              </div>
+              <div class="marker-item marker-info">
+                🔍 <strong>Jitter trending upward</strong><br>
+                <span style="font-size:.68rem;">3.2% jitter detected — borderline range. Monitor for neurological indicators.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ LAB ════ -->
+      <div class="panel" id="p-lab">
+        <div class="sec-hd">
+          <div class="sec-hd-left">
+            <h1>Lab Report Analyzer</h1>
+            <p>AI interpretation · CBC, lipid panel, HbA1c, metabolic panel and more</p>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="card">
+            <div class="upload-zone" id="uploadZone"
+              onclick="document.getElementById('labFile').click()"
+              ondragover="event.preventDefault();this.classList.add('dragover')"
+              ondragleave="this.classList.remove('dragover')"
+              ondrop="handleDrop(event)">
+              <div class="upload-ico">🧬</div>
+              <div class="upload-title">Upload Lab Report</div>
+              <div class="upload-sub">PDF, image or text · drag & drop or click</div>
+              <input type="file" id="labFile" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.txt" onchange="handleFile(this)">
+              <button class="btn btn-ghost btn-sm" style="margin-top:10px;">Choose File</button>
+            </div>
+            <div style="margin-top:16px;">
+              <div class="card-title">Or enter values manually</div>
+              <div class="lab-grid">
+                <div class="fi"><label>HbA1c (%)</label><input type="number" id="hba1c" placeholder="5.7" step="0.1"></div>
+                <div class="fi"><label>Total Cholesterol</label><input type="number" id="chol" placeholder="200"></div>
+                <div class="fi"><label>Systolic BP</label><input type="number" id="sbp" placeholder="120"></div>
+                <div class="fi"><label>Creatinine</label><input type="number" id="creat" placeholder="1.0" step="0.1"></div>
+                <div class="fi"><label>Hemoglobin</label><input type="number" id="hgb" placeholder="14.0" step="0.1"></div>
+                <div class="fi"><label>TSH</label><input type="number" id="tsh" placeholder="2.5" step="0.1"></div>
+              </div>
+              <button class="btn btn-primary" style="width:100%;" onclick="analyzeLabs()">🧪 Analyze with AI →</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🧪 Interpretation Results</div>
+            <div id="labOut">
+              <div class="loading-center" style="min-height:200px;">
+                <div style="font-size:2rem;">🔬</div>
+                <div>Upload a report or enter values to see AI interpretation</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ AI CHAT ════ -->
+      <div class="panel" id="p-ai">
+        <div class="chat-wrap">
+          <div class="chat-hd">
+            <div class="chat-avatar">🤖</div>
+            <div>
+              <div class="chat-title">PremortemAI Assistant</div>
+              <div class="chat-online"><span class="online-dot"></span>Online · claude-sonnet-4-6</div>
+            </div>
+            <div style="margin-left:auto;font-size:.65rem;color:var(--text3);font-family:var(--font-mono);">Model: claude-sonnet-4-6</div>
+          </div>
+          <div class="quick-row">
+            <button class="q-btn" onclick="q('What is my biggest risk right now?')">⚡ Biggest risk</button>
+            <button class="q-btn" onclick="q('Explain my voice stress score in detail')">🎙 Voice stress</button>
+            <button class="q-btn" onclick="q('Recommend lifestyle changes based on my health data')">🌿 Lifestyle changes</button>
+            <button class="q-btn" onclick="q('Generate a summary report I can share with my doctor')">📋 Doctor report</button>
+            <button class="q-btn" onclick="q('What are the emergency warning signs I should watch for?')">🚨 Emergency guidance</button>
+          </div>
+          <div class="msgs" id="msgs">
+            <div class="msg ai">
+              <div class="msg-av">🤖</div>
+              <div class="bubble">Hello! I have access to all your health signals — voice stress (78/100), sleep quality (34%), and your recent lab trends. What would you like to understand about your health right now?</div>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <textarea class="ci" id="ci" rows="1" placeholder="Ask anything about your health data…" onkeydown="ciKey(event)"></textarea>
+            <button class="btn btn-primary" onclick="sendMsg()">↑</button>
+          </div>
+          <div class="conf-row">
+            <div class="conf-item"><div class="conf-l">Voice analysis</div><div class="conf-v">94%</div></div>
+            <div class="conf-item"><div class="conf-l">Risk prediction</div><div class="conf-v">81%</div></div>
+            <div class="conf-item"><div class="conf-l">Lab interpretation</div><div class="conf-v">97%</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ ALERTS ════ -->
+      <div class="panel" id="p-alerts">
+        <div class="sec-hd">
+          <div class="sec-hd-left">
+            <h1>Smart Alert Center</h1>
+            <p>Prioritized health notifications · Last updated just now</p>
+          </div>
+        </div>
+        <div class="flt-row">
+          <button class="flt-btn active" onclick="flt('all',this)">All Alerts</button>
+          <button class="flt-btn" onclick="flt('critical',this)">Critical Only</button>
+          <button class="flt-btn" onclick="flt('ok',this)">Normal</button>
+        </div>
+        <div id="alertList">
+          <div class="alert-card critical" data-t="critical">
+            <div class="alert-top">
+              <div>
+                <div class="alert-title">🚨 Hypertensive Event — 67% Probability</div>
+                <div class="alert-body">Combined signals: voice stress 78/100 + sleep deficit + elevated morning HR pattern. Probability window: next 48 hours.</div>
+              </div>
+              <div class="alert-btns">
+                <button class="btn btn-ghost btn-sm" onclick="askAbout('Hypertensive event 67% probability — what should I do?')">Ask AI</button>
+                <button class="dismiss-btn" onclick="dismiss(this)">✕</button>
+              </div>
+            </div>
+            <div class="alert-meta">⏱ 2 minutes ago · 5-signal fusion model</div>
+          </div>
+          <div class="alert-card warning" data-t="warning">
+            <div class="alert-top">
+              <div>
+                <div class="alert-title">😴 REM Sleep Deficit — 3rd Consecutive Night</div>
+                <div class="alert-body">Only 34% sleep quality detected. Chronic REM deficit linked to increased cortisol and cardiovascular risk.</div>
+              </div>
+              <div class="alert-btns"><button class="dismiss-btn" onclick="dismiss(this)">✕</button></div>
+            </div>
+            <div class="alert-meta">⏱ 6 hours ago · Sleep sensor analysis</div>
+          </div>
+          <div class="alert-card warning" data-t="warning">
+            <div class="alert-top">
+              <div>
+                <div class="alert-title">🎙 Voice Stress Index Up 85% from Baseline</div>
+                <div class="alert-body">Weekly trend: 42 → 78. Jitter at 3.2% (borderline). Possible early sympathetic nervous system activation.</div>
+              </div>
+              <div class="alert-btns"><button class="dismiss-btn" onclick="dismiss(this)">✕</button></div>
+            </div>
+            <div class="alert-meta">⏱ 1 hour ago · Voice biomarker module</div>
+          </div>
+          <div class="alert-card ok" data-t="ok">
+            <div class="alert-top">
+              <div>
+                <div class="alert-title">✅ Mobility Pattern — Normal</div>
+                <div class="alert-body">Gait analysis normal. Step regularity 94%. No fall risk indicators. Neurological pattern stable.</div>
+              </div>
+              <div class="alert-btns"><button class="dismiss-btn" onclick="dismiss(this)">✕</button></div>
+            </div>
+            <div class="alert-meta">⏱ 30 minutes ago · Mobility sensor</div>
+          </div>
+        </div>
+        <div class="card mt" style="margin-top:14px;">
+          <div class="card-title">Event Timeline</div>
+          <div class="tl">
+            <div class="tl-item"><span class="tl-time">Now</span>Risk score crossed threshold (67)</div>
+            <div class="tl-item"><span class="tl-time">1h ago</span>Voice stress index elevated</div>
+            <div class="tl-item"><span class="tl-time">6h ago</span>Sleep quality dropped to 34%</div>
+            <div class="tl-item"><span class="tl-time">1d ago</span>All signals within normal range</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /body -->
+</div><!-- /app -->
+
+<script>
+/* ═══════════════════════════
+   CONFIG — set your backend URL
+   During local dev: http://localhost:3001
+   After deploy:     https://your-cloud-run-url
+═══════════════════════════ */
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3001'
+  : '';  // same-origin when frontend & backend are co-deployed
+
+/* ═══════════════════════════
+   HEALTH CONTEXT (injected into AI calls)
+═══════════════════════════ */
+const CTX = `Patient: Demo User.
+Current real-time signals:
+- Voice Stress Index: 78/100 (elevated +36 from baseline, jitter 3.2%, shimmer 0.28)
+- Heart Rate (Facial rPPG): 72 bpm, BP estimate: 128/82 mmHg
+- Sleep Quality: 34% (REM deficit — 3rd consecutive night)
+- Typing Rhythm: 61/100 (slight irregularity detected)
+- Mobility Score: 84/100 (normal gait, step regularity 94%)
+- Composite Risk Score: 67/100 (Elevated)
+- 48-hour prediction: 67% hypertensive event probability
+
+You are PremortemAI, an evidence-based AI health assistant. Be concise, cite signals, never diagnose — recommend physician consultation for serious concerns. If emergency, direct to emergency services immediately.`;
+
+/* ═══════════════════════════
+   CLOCK
+═══════════════════════════ */
+setInterval(() => {
+  document.getElementById('topClock').textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+/* ═══════════════════════════
+   NAV
+═══════════════════════════ */
+function nav(el) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('p-' + el.dataset.tab).classList.add('active');
+  if (el.dataset.tab === 'dashboard') initDashCharts();
+  if (el.dataset.tab === 'voice')     initVoiceChart();
+}
+
+/* ═══════════════════════════
+   LIVE SIGNAL SIMULATION
+═══════════════════════════ */
+const state = { voice:78, hr:72, sleep:34, typing:61, mob:84 };
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function jit(v,d){ return clamp(v+(Math.random()-.5)*d, 0, 100); }
+
+function tick() {
+  state.voice  = jit(state.voice, 3);
+  state.hr     = clamp(state.hr + (Math.random()-.5)*2, 55, 105);
+  state.sleep  = jit(state.sleep, 1.5);
+  state.typing = jit(state.typing, 2.5);
+  state.mob    = jit(state.mob, 1.5);
+
+  const risk = clamp(Math.round(
+    state.voice*.30 + (100-state.sleep)*.25 + state.typing*.20 +
+    ((state.hr-60)/40*100)*.15 + (100-state.mob)*.10
+  ), 0, 100);
+
+  // Update DOM
+  set('sv-voice',  Math.round(state.voice));
+  set('sv-hr',     Math.round(state.hr));
+  set('sv-sleep',  Math.round(state.sleep));
+  set('sv-typing', Math.round(state.typing));
+  set('sv-mob',    Math.round(state.mob));
+  set('riskVal',   risk);
+  set('topRisk',   risk);
+
+  // Bars
+  w('sb-voice',  state.voice);
+  w('sb-hr',     (state.hr-55)/50*100);
+  w('sb-sleep',  state.sleep);
+  w('sb-typing', state.typing);
+  w('sb-mob',    state.mob);
+
+  // Arc
+  const arc = document.getElementById('riskArc');
+  const perim = 2 * Math.PI * 54; // r=54
+  arc.style.strokeDasharray  = perim;
+  arc.style.strokeDashoffset = perim - (risk/100)*perim;
+  arc.style.stroke = risk>70?'var(--danger)':risk>50?'var(--warn)':'var(--success)';
+  document.getElementById('riskVal').style.color = arc.style.stroke;
+  document.getElementById('topRisk').style.color  = arc.style.stroke;
+
+  const badge = document.getElementById('riskBadge');
+  badge.textContent = risk>70?'🔴 High Risk':risk>50?'⚠ Elevated Risk':'✅ Normal Risk';
+  badge.style.color = arc.style.stroke;
+}
+
+function set(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+function w(id,v){ const e=document.getElementById(id); if(e) e.style.width=v+'%'; }
+
+setInterval(tick, 3000);
+
+/* ═══════════════════════════
+   CHARTS
+═══════════════════════════ */
+let dashReady=false, voiceReady=false;
+
+const CHART_DEFAULTS = {
+  color:'#8fa8c8',
+  gridColor:'rgba(24,38,64,0.8)',
+  tickFont:{ size:9, family:"'Space Mono', monospace" }
+};
+
+function initDashCharts() {
+  if (dashReady) return; dashReady=true;
+
+  new Chart(document.getElementById('trendChart').getContext('2d'), {
+    type:'line',
+    data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[{
+        label:'Risk Score', data:[42,38,51,55,48,62,67],
+        borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.07)',
+        fill:true, tension:.4, pointBackgroundColor:'#f59e0b', pointRadius:3,
+        borderWidth:2,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{color:CHART_DEFAULTS.gridColor}, ticks:{color:CHART_DEFAULTS.color,font:CHART_DEFAULTS.tickFont} },
+        y:{ grid:{color:CHART_DEFAULTS.gridColor}, ticks:{color:CHART_DEFAULTS.color,font:CHART_DEFAULTS.tickFont}, min:0, max:100 }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('radarChart').getContext('2d'), {
+    type:'radar',
+    data:{
+      labels:['Voice','rPPG','Sleep','Typing','Mobility'],
+      datasets:[{
+        label:'Signals', data:[78,72,34,61,84],
+        borderColor:'#00e5ff', backgroundColor:'rgba(0,229,255,0.07)',
+        pointBackgroundColor:'#00e5ff', pointRadius:3, borderWidth:2,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        r:{
+          grid:{color:CHART_DEFAULTS.gridColor},
+          ticks:{display:false},
+          pointLabels:{color:CHART_DEFAULTS.color, font:{ size:9, family:"'DM Sans',sans-serif" }},
+          min:0, max:100,
+          angleLines:{color:CHART_DEFAULTS.gridColor}
+        }
+      }
+    }
+  });
+}
+
+function initVoiceChart() {
+  if (voiceReady) return; voiceReady=true;
+  const labels = Array.from({length:14},(_,i)=>`D${i+1}`);
+  new Chart(document.getElementById('voiceTrend').getContext('2d'), {
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        data:[48,45,52,50,55,58,54,60,65,62,70,72,75,78],
+        borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.05)',
+        fill:true, tension:.4, pointRadius:2, borderWidth:2,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:CHART_DEFAULTS.gridColor},ticks:{color:CHART_DEFAULTS.color,font:CHART_DEFAULTS.tickFont}},
+        y:{grid:{color:CHART_DEFAULTS.gridColor},ticks:{color:CHART_DEFAULTS.color,font:CHART_DEFAULTS.tickFont},min:0,max:100}
+      }
+    }
+  });
+}
+
+window.addEventListener('load', initDashCharts);
+
+/* ═══════════════════════════
+   VOICE RECORDING
+═══════════════════════════ */
+let recActive=false, recTimer=null;
+function toggleRec() {
+  if (!recActive) startRec(); else stopRec();
+}
+function startRec() {
+  recActive=true;
+  const btn=document.getElementById('micBtn');
+  const st=document.getElementById('recStatus');
+  btn.classList.add('rec'); btn.textContent='⏹';
+document.querySelectorAll('.wave').forEach(w => w.classList.add('active'));
+  st.style.color='var(--danger)';
+  let t=5;
+  st.textContent=`● Recording… (${t}s)`;
+  recTimer=setInterval(()=>{
+    t--;
+    st.textContent=`● Recording… (${t}s)`;
+    if(t<=0){clearInterval(recTimer);stopRec();}
+  },1000);
+}
+function stopRec() {
+  recActive=false; clearInterval(recTimer);
+  const btn=document.getElementById('micBtn');
+  const st=document.getElementById('recStatus');
+  btn.classList.remove('rec'); btn.textContent='🎙';
+document.querySelectorAll('.wave').forEach(w => w.classList.remove('active'));
+  st.textContent='Analyzing…'; st.style.color='var(--accent)';
+  setTimeout(()=>{
+    document.getElementById('bPitch').textContent   = (138+Math.random()*18).toFixed(1);
+    document.getElementById('bEnergy').textContent  = (-20+Math.random()*5).toFixed(1);
+    document.getElementById('bJitter').textContent  = (2.8+Math.random()*.6).toFixed(2);
+    document.getElementById('bShimmer').textContent = (.26+Math.random()*.06).toFixed(3);
+    st.textContent='✓ Analysis complete'; st.style.color='var(--success)';
+    // Post to backend
+    postVoice();
+  },1600);
+}
+async function postVoice(){
+  try {
+    await fetch(API+'/api/analyze-voice',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        pitch:parseFloat(document.getElementById('bPitch').textContent),
+        jitterPct:parseFloat(document.getElementById('bJitter').textContent),
+        stressIndex:78
+      })
+    });
+  } catch{}
+}
+
+/* ═══════════════════════════
+   LAB ANALYSIS
+═══════════════════════════ */
+function handleFile(inp){
+  if(inp.files&&inp.files[0]){
+    document.querySelector('.upload-title').textContent='✓ '+inp.files[0].name;
+    document.querySelector('.upload-sub').textContent='Ready — click Analyze with AI →';
+  }
+}
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f){document.querySelector('.upload-title').textContent='✓ '+f.name;}
+}
+
+async function analyzeLabs(){
+  const labData={
+    hba1c:  document.getElementById('hba1c').value,
+    chol:   document.getElementById('chol').value,
+    sbp:    document.getElementById('sbp').value,
+    creat:  document.getElementById('creat').value,
+    hgb:    document.getElementById('hgb').value,
+    tsh:    document.getElementById('tsh').value,
+  };
+  const out=document.getElementById('labOut');
+  out.innerHTML='<div class="loading-center"><div class="spinner"></div><div>Analyzing with AI…</div></div>';
+  try {
+    const r=await fetch(API+'/api/analyze-labs',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({labData})
+    });
+    if(!r.ok) throw new Error();
+    const d=await r.json();
+    renderLabOut(d);
+  } catch {
+    renderLabFallback(labData);
+  }
+}
+
+const SC = {normal:'s-normal',borderline:'s-borderline',high:'s-high',low:'s-low'};
+function renderLabOut(d){
+  const out=document.getElementById('labOut');
+  let html='';
+  if(d.summary){
+    html+=`<div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.18);border-radius:8px;padding:9px 12px;font-size:.78rem;margin-bottom:12px;color:var(--text2);">${d.summary}</div>`;
+  }
+  if(d.results&&d.results.length){
+    d.results.forEach(r=>{
+      if(!r.value||(r.value.trim()==='')||r.value.startsWith(' ')) return;
+      html+=`<div class="lab-result-row">
+        <div>
+          <div style="font-weight:600;font-size:.8rem;">${r.marker}</div>
+          <div style="font-size:.65rem;color:var(--text3);">${r.note||''}</div>
+        </div>
+        <div class="lrr-right">
+          <div class="lrr-val">${r.value}</div>
+          <div class="${SC[r.status]||'s-normal'}">${(r.status||'').toUpperCase()}</div>
+        </div>
+      </div>`;
+    });
+  }
+  if(d.recommendations&&d.recommendations.length){
+    html+=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">`;
+    d.recommendations.forEach(rec=>{
+      html+=`<div style="font-size:.72rem;color:var(--text2);padding:3px 0;">• ${rec}</div>`;
+    });
+    html+='</div>';
+  }
+  out.innerHTML=html;
+}
+
+function renderLabFallback(labData){
+  const results=[];
+  const {hba1c,chol,sbp,creat,hgb,tsh}=labData;
+  if(hba1c){const v=parseFloat(hba1c);results.push({marker:'HbA1c',value:`${v}%`,status:v<5.7?'normal':v<6.5?'borderline':'high',note:v>=6.5?'Diabetic range':v>=5.7?'Pre-diabetic':'Normal glycemic control'});}
+  if(chol){const v=parseFloat(chol);results.push({marker:'Total Cholesterol',value:`${v} mg/dL`,status:v<200?'normal':v<240?'borderline':'high',note:v>=240?'High cardiovascular risk':'Within range'});}
+  if(sbp){const v=parseFloat(sbp);results.push({marker:'Systolic BP',value:`${v} mmHg`,status:v<120?'normal':v<140?'borderline':'high',note:v>=140?'Hypertensive range':v>=120?'Elevated':'Optimal'});}
+  if(creat){const v=parseFloat(creat);results.push({marker:'Creatinine',value:`${v} mg/dL`,status:v<1.2?'normal':v<1.5?'borderline':'high',note:v>=1.5?'Renal function check needed':'Normal'});}
+  if(hgb){const v=parseFloat(hgb);results.push({marker:'Hemoglobin',value:`${v} g/dL`,status:v>=12?'normal':v>=10?'borderline':'low',note:v<12?'Anemia evaluation needed':'Normal'});}
+  if(tsh){const v=parseFloat(tsh);results.push({marker:'TSH',value:`${v} mIU/L`,status:(v>=0.4&&v<=4.0)?'normal':'borderline',note:v>4?'Possible hypothyroidism':v<0.4?'Possible hyperthyroidism':'Normal thyroid function'});}
+  const high=results.filter(r=>r.status==='high').length;
+  renderLabOut({results,summary:`${results.length} markers analyzed. ${high} value(s) require attention.`,recommendations:high>0?['Review flagged values with your physician','Retest in 3 months']:['Continue current health habits']});
+}
+
+/* ═══════════════════════════
+   AI CHAT
+═══════════════════════════ */
+let history=[];
+
+async function sendMsg(){
+  const ci=document.getElementById('ci');
+  const txt=ci.value.trim(); if(!txt) return;
+  ci.value='';
+  appendMsg('usr',txt);
+  history.push({role:'user',content:txt});
+  showTyping();
+  try{
+    const r=await fetch(API+'/api/chat',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:history.slice(-12),context:CTX})
+    });
+    if(!r.ok) throw new Error();
+    const d=await r.json();
+    removeTyping();
+    appendMsg('ai',d.reply);
+    history.push({role:'assistant',content:d.reply});
+  } catch {
+    removeTyping();
+    appendMsg('ai',"⚠ Could not reach the backend. Make sure the server is running on port 3001 and ANTHROPIC_API_KEY is set in your .env file.");
+  }
+}
+
+function q(txt){ document.getElementById('ci').value=txt; sendMsg(); }
+
+function ciKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+
+function appendMsg(role,txt){
+  const msgs=document.getElementById('msgs');
+  const d=document.createElement('div');
+  d.className=`msg ${role}`;
+  d.innerHTML=`<div class="msg-av">${role==='ai'?'🤖':'👤'}</div><div class="bubble">${txt.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>`;
+  msgs.appendChild(d);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function showTyping(){
+  const d=document.createElement('div');
+  d.className='msg ai'; d.id='typing';
+  d.innerHTML='<div class="msg-av">🤖</div><div class="bubble"><div class="typing-dots"><div class="td"></div><div class="td"></div><div class="td"></div></div></div>';
+  document.getElementById('msgs').appendChild(d);
+  document.getElementById('msgs').scrollTop=99999;
+}
+function removeTyping(){ const t=document.getElementById('typing'); if(t)t.remove(); }
+
+function askAbout(txt){ nav(document.querySelector('[data-tab="ai"]')); q(txt); }
+
+/* ═══════════════════════════
+   RUN AI ANALYSIS (from dashboard)
+═══════════════════════════ */
+function runAI(){
+  nav(document.querySelector('[data-tab="ai"]'));
+  q('Run a full analysis of all my health signals and tell me what I should focus on most urgently.');
+}
+
+/* ═══════════════════════════
+   ALERTS
+═══════════════════════════ */
+function flt(type,btn){
+  document.querySelectorAll('.flt-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.alert-card').forEach(c=>{
+    c.style.display=(type==='all'||c.dataset.t===type)?'block':'none';
+  });
+}
+
+function dismiss(btn){
+  const card=btn.closest('.alert-card');
+  card.style.opacity='0'; card.style.transform='translateX(20px)';
+  card.style.transition='all .25s';
+  setTimeout(()=>{ card.remove(); updateBadge(); },250);
+}
+
+function updateBadge(){
+  const n=document.querySelectorAll('.alert-card[data-t="critical"]').length;
+  const b=document.getElementById('alertBadge');
+  b.textContent=n; b.style.display=n>0?'flex':'none';
+}
+function startApp() {
+  document.getElementById("landing").style.display = "none";
+}
+
+const oldRunAI = runAI;
+runAI = function() {
+  document.getElementById("loadingOverlay").style.display = "flex";
+
+  setTimeout(() => {
+    document.getElementById("loadingOverlay").style.display = "none";
+  }, 1500);
+
+  oldRunAI();
+};
+function openHelp() {
+  document.getElementById("helpModal").style.display = "flex";
+}
+
+function closeHelp() {
+  document.getElementById("helpModal").style.display = "none";
+}
+</script>
+</body>
+</html>
